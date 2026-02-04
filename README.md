@@ -21,7 +21,7 @@ Include tecniche avanzate anti-detection per ridurre il rischio di essere blocca
 
 2. **Crea un virtual environment (consigliato):**
    ```bash
-   python -m venv venv
+   python3 -m venv venv
    source venv/bin/activate  # Linux/Mac
    # oppure
    venv\Scripts\activate     # Windows
@@ -29,7 +29,7 @@ Include tecniche avanzate anti-detection per ridurre il rischio di essere blocca
 
 3. **Installa le dipendenze:**
    ```bash
-   pip install -r requirements.txt
+   pip3 install -r requirements.txt
    ```
 
 4. **Installa il browser Chromium:**
@@ -42,7 +42,10 @@ Include tecniche avanzate anti-detection per ridurre il rischio di essere blocca
 ### Comando base
 
 ```bash
-python scraper.py "la tua query"
+python3 scraper.py "la tua query"
+
+# Oppure direttamente (lo script è eseguibile)
+./scraper.py "la tua query"
 ```
 
 ### Opzioni disponibili
@@ -64,31 +67,31 @@ python scraper.py "la tua query"
 
 ```bash
 # Query semplice (con anti-detection attivo di default)
-python scraper.py "best budget laptops 2024"
+python3 scraper.py "best budget laptops 2024"
 
 # Con screenshot per verificare visivamente
-python scraper.py "migliori smartphone" --screenshot debug.png
+python3 scraper.py "migliori smartphone" --screenshot debug.png
 
 # Vedere il browser in azione (debug)
-python scraper.py "artificial intelligence" --no-headless
+python3 scraper.py "artificial intelligence" --no-headless
 
 # Locale italiano
-python scraper.py "intelligenza artificiale" --locale it-IT
+python3 scraper.py "intelligenza artificiale" --locale it-IT
 
 # Output personalizzato con screenshot
-python scraper.py "quantum computing" -o risultato.json -s pagina.png
+python3 scraper.py "quantum computing" -o risultato.json -s pagina.png
 
 # Timeout più lungo per connessioni lente
-python scraper.py "machine learning" --timeout 60000
+python3 scraper.py "machine learning" --timeout 60000
 
 # Massima sicurezza anti-detection (ritardi più lunghi)
-python scraper.py "AI news" --min-delay 5 --max-delay 15
+python3 scraper.py "AI news" --min-delay 5 --max-delay 15
 
 # Modalità veloce (meno sicuro, più rapido)
-python scraper.py "test query" --direct --no-delay
+python3 scraper.py "test query" --direct --no-delay
 
 # Bilanciato: salta homepage ma mantieni ritardi
-python scraper.py "python tutorial" --direct --min-delay 3 --max-delay 8
+python3 scraper.py "python tutorial" --direct --min-delay 3 --max-delay 8
 ```
 
 ## Output

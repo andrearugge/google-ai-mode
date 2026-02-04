@@ -1,9 +1,116 @@
 import json
 import argparse
 import urllib.parse
+import random
+import time
 from datetime import datetime
 from pathlib import Path
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+
+
+# Pool di User-Agent realistici (browser recenti)
+USER_AGENTS = [
+    # Chrome Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    # Chrome Mac
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    # Firefox Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+    # Firefox Mac
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
+    # Safari Mac
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+    # Edge Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
+]
+
+
+def get_random_user_agent() -> str:
+    """Restituisce un User-Agent casuale dal pool."""
+    return random.choice(USER_AGENTS)
+
+
+def random_delay(min_seconds: float = 2.0, max_seconds: float = 8.0) -> None:
+    """Applica un ritardo casuale per simulare comportamento umano."""
+    delay = random.uniform(min_seconds, max_seconds)
+    print(f"Attesa di {delay:.1f} secondi...")
+    time.sleep(delay)
+
+
+def simulate_human_behavior(page) -> None:
+    """Simula comportamento umano con scroll e movimenti mouse casuali."""
+    # Scroll casuale
+    scroll_amount = random.randint(100, 400)
+    page.mouse.wheel(0, scroll_amount)
+    page.wait_for_timeout(random.randint(300, 800))
+
+    # Torna su
+    page.mouse.wheel(0, -scroll_amount // 2)
+    page.wait_for_timeout(random.randint(200, 500))
+
+    # Movimento mouse casuale
+    for _ in range(random.randint(2, 4)):
+        x = random.randint(100, 800)
+        y = random.randint(100, 600)
+        page.mouse.move(x, y)
+        page.wait_for_timeout(random.randint(50, 150))
+
+
+def get_stealth_scripts() -> str:
+    """Script JS per nascondere i segnali di automazione Playwright."""
+    return """
+    // Nascondi webdriver
+    Object.defineProperty(navigator, 'webdriver', {
+        get: () => undefined
+    });
+
+    // Nascondi automazione Chrome
+    window.chrome = {
+        runtime: {},
+    };
+
+    // Nascondi permessi
+    const originalQuery = window.navigator.permissions.query;
+    window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications' ?
+            Promise.resolve({ state: Notification.permission }) :
+            originalQuery(parameters)
+    );
+
+    // Plugin realistici
+    Object.defineProperty(navigator, 'plugins', {
+        get: () => [
+            { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+            { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+            { name: 'Native Client', filename: 'internal-nacl-plugin' },
+        ],
+    });
+
+    // Lingue realistiche
+    Object.defineProperty(navigator, 'languages', {
+        get: () => ['en-US', 'en', 'it'],
+    });
+
+    // Hardware concurrency realistico
+    Object.defineProperty(navigator, 'hardwareConcurrency', {
+        get: () => 8,
+    });
+
+    // Device memory realistico
+    Object.defineProperty(navigator, 'deviceMemory', {
+        get: () => 8,
+    });
+
+    // Nascondi automation flags
+    delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+    delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+    delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+    """
 
 
 # Selectors that are SPECIFIC to Google AI Mode
@@ -73,6 +180,9 @@ def query_google_ai_mode(
     timeout: int = 30000,
     locale: str = "en-US",
     screenshot_path: str = None,
+    min_delay: float = 2.0,
+    max_delay: float = 8.0,
+    start_from_homepage: bool = True,
 ) -> dict:
     """
     Query Google AI Mode using Playwright.
@@ -83,6 +193,9 @@ def query_google_ai_mode(
         timeout: Timeout in milliseconds for AI response (default: 30000)
         locale: Browser locale (default: en-US)
         screenshot_path: Path to save screenshot for debugging (optional)
+        min_delay: Minimum delay in seconds before request (default: 2.0)
+        max_delay: Maximum delay in seconds before request (default: 8.0)
+        start_from_homepage: Visit Google homepage first (default: True)
 
     Returns:
         Dict with query, AI response, sources, verification info, and metadata
@@ -100,18 +213,109 @@ def query_google_ai_mode(
         "sources": [],
         "screenshot": None,
         "error": None,
+        "user_agent": None,
     }
 
+    # Applica ritardo casuale prima della richiesta
+    random_delay(min_delay, max_delay)
+
+    # Seleziona User-Agent casuale
+    user_agent = get_random_user_agent()
+    result["user_agent"] = user_agent
+    print(f"User-Agent: {user_agent[:50]}...")
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
+        # Args per sembrare un browser normale
+        browser_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-infobars",
+            "--disable-dev-shm-usage",
+            "--disable-browser-side-navigation",
+            "--disable-gpu",
+            "--no-first-run",
+            "--no-service-autorun",
+            "--password-store=basic",
+            "--use-mock-keychain",
+        ]
+
+        browser = p.chromium.launch(
+            headless=headless,
+            args=browser_args,
+        )
+
+        # Viewport casuali per sembrare più umani
+        viewports = [
+            {"width": 1920, "height": 1080},
+            {"width": 1366, "height": 768},
+            {"width": 1536, "height": 864},
+            {"width": 1280, "height": 720},
+            {"width": 1440, "height": 900},
+        ]
+        viewport = random.choice(viewports)
+
+        # Timezone casuali realistici
+        timezones = [
+            "Europe/Rome",
+            "Europe/London",
+            "America/New_York",
+            "America/Los_Angeles",
+        ]
+
         context = browser.new_context(
             locale=locale,
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 900},
+            user_agent=user_agent,
+            viewport=viewport,
+            timezone_id=random.choice(timezones),
+            geolocation=None,
+            permissions=[],
         )
+
+        # Inietta script stealth prima di ogni pagina
+        context.add_init_script(get_stealth_scripts())
+
         page = context.new_page()
 
         try:
+            # Opzionalmente parti dalla homepage (più naturale)
+            if start_from_homepage:
+                print("Visitando prima la homepage di Google...")
+                page.goto("https://www.google.com", wait_until="networkidle", timeout=timeout)
+                page.wait_for_timeout(random.randint(1000, 2000))
+
+                # Accetta cookie sulla homepage se necessario
+                try:
+                    accept_btn = page.locator(
+                        "button:has-text('Accept all'), "
+                        "button:has-text('Accept'), "
+                        "button:has-text('Accetta tutto'), "
+                        "button:has-text('Accetta')"
+                    )
+                    if accept_btn.count() > 0:
+                        accept_btn.first.click(timeout=3000)
+                        page.wait_for_timeout(random.randint(500, 1000))
+                except PlaywrightTimeout:
+                    pass
+
+                # Simula digitazione nella search box
+                search_box = page.locator("textarea[name='q'], input[name='q']").first
+                if search_box.count() > 0:
+                    search_box.click()
+                    page.wait_for_timeout(random.randint(200, 500))
+
+                    # Digita carattere per carattere (più umano)
+                    for char in query:
+                        search_box.type(char, delay=random.randint(50, 150))
+
+                    page.wait_for_timeout(random.randint(300, 700))
+
+                    # Cerca tramite submit invece che andando direttamente all'URL
+                    page.keyboard.press("Enter")
+                    page.wait_for_load_state("networkidle")
+
+                    # Ora naviga alla versione AI Mode
+                    page.wait_for_timeout(random.randint(500, 1000))
+
+            # Vai all'URL AI Mode (o se partito dalla homepage, aggiungi udm=50)
             page.goto(url, wait_until="networkidle", timeout=timeout)
 
             # Accept cookies if dialog appears
@@ -128,8 +332,11 @@ def query_google_ai_mode(
             except PlaywrightTimeout:
                 pass
 
+            # Simula comportamento umano (scroll, mouse)
+            simulate_human_behavior(page)
+
             # Wait a bit for AI content to load (it can be async)
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(random.randint(1500, 3000))
 
             # Verify we're in AI Mode
             verification = verify_ai_mode(page)
@@ -237,11 +444,37 @@ if __name__ == "__main__":
         "--screenshot", "-s",
         help="Salva screenshot della pagina (es: screenshot.png)",
     )
+    parser.add_argument(
+        "--min-delay",
+        type=float,
+        default=2.0,
+        help="Ritardo minimo in secondi prima della richiesta (default: 2.0)",
+    )
+    parser.add_argument(
+        "--max-delay",
+        type=float,
+        default=8.0,
+        help="Ritardo massimo in secondi prima della richiesta (default: 8.0)",
+    )
+    parser.add_argument(
+        "--no-delay",
+        action="store_true",
+        help="Disabilita il ritardo (utile per test)",
+    )
+    parser.add_argument(
+        "--direct",
+        action="store_true",
+        help="Vai direttamente all'URL (salta la homepage)",
+    )
 
     args = parser.parse_args()
 
     print(f"Cercando: {args.query}")
     print("Attendere...")
+
+    # Configura ritardi
+    min_delay = 0.0 if args.no_delay else args.min_delay
+    max_delay = 0.0 if args.no_delay else args.max_delay
 
     result = query_google_ai_mode(
         query=args.query,
@@ -249,6 +482,9 @@ if __name__ == "__main__":
         timeout=args.timeout,
         locale=args.locale,
         screenshot_path=args.screenshot,
+        min_delay=min_delay,
+        max_delay=max_delay,
+        start_from_homepage=not args.direct,
     )
 
     save_response(result, args.output)
